@@ -34,6 +34,9 @@ pub(crate) struct ScrollTables {
     pub(super) wheel_lock: scroll_x::WheelLock,
     /// Whole notches of a mouse wheel ease where the platform's browsers do (`Runtime::set_wheel_glide`).
     wheel_glide: bool,
+    /// A phased trackpad gesture stretches a viewport past its ends (`runtime/scroll/stretch.rs`):
+    /// macOS, as `NSScrollView` does.
+    elastic: bool,
 }
 
 impl ScrollTables {
@@ -49,6 +52,7 @@ impl ScrollTables {
             requests: Default::default(),
             wheel_lock: Default::default(),
             wheel_glide: true,
+            elastic: cfg!(target_os = "macos"),
         }
     }
 
@@ -66,6 +70,23 @@ impl ScrollTables {
     #[inline]
     pub(in crate::runtime) fn wheel_gesture(&self) -> Attempt {
         self.wheel_lock.gesture
+    }
+
+    /// Whether a phased trackpad gesture stretches a viewport past its ends on this platform.
+    #[inline]
+    pub(in crate::runtime) fn elastic(&self) -> bool {
+        self.elastic
+    }
+
+    #[cfg(test)]
+    pub(in crate::runtime) fn set_elastic(&mut self, on: bool) {
+        self.elastic = on;
+    }
+
+    /// The fingers of a phased trackpad gesture are on the trackpad at `now`.
+    #[inline]
+    pub(in crate::runtime) fn wheel_touching(&self, now: f64) -> bool {
+        self.wheel_lock.touching(now)
     }
 
     #[inline]

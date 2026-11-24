@@ -789,17 +789,37 @@ impl RuntimeCore {
         self.drop_scroll_holds();
         self.dismiss_help();
         let now = self.now_clock();
-        let Some((id, held)) = self.wheel_run(now, x, y, dy, mods, phased, start) else { return };
-        let stick = self.tree.node_index.get(&id).and_then(|&i| self.tree.nodes[i].scroll).is_some_and(|s| s.stick_bottom);
+        let elastic = self.scroll.elastic() && phased;
+        // At its end, a trackpad stretches the innermost viewport there rather than stopping, one
+        // whose content fits included, as `NSScrollView` bounces vertically whatever its content.
+        let run = self.wheel_run(now, x, y, dy, mods, phased, start).or_else(|| {
+            let at = match start { crate::runtime::gesture_dispatch::WheelStart::At(s) => s, crate::runtime::gesture_dispatch::WheelStart::Unknown => self.chain_start(x, y) };
+            elastic.then(|| self.scroll_in_chain(at, false, |_| true)).flatten().map(|id| (id, false))
+        });
+        let Some((id, held)) = run else { return };
+        let node = self.tree.node_index.get(&id).map(|&i| &self.tree.nodes[i]);
+        let stick = node.and_then(|n| n.scroll).is_some_and(|s| s.stick_bottom);
+        let height = node.map_or(0.0, |n| f64::from(n.target[3] - n.target[1]));
         let Some(st) = self.scroll.scrolls.get_mut(&id) else { return };
         let before = st.offset;
-        st.offset = (st.offset - f64::from(dy)).clamp(0.0, st.max);
+        if elastic {
+            let axis = scroll_stretch::Axis { offset: st.offset, max: st.max, height };
+            let dy = f64::from(dy);
+            let event = if momentum { scroll_stretch::Event::Momentum { dy, now, axis } } else { scroll_stretch::Event::Finger { dy, now, axis } };
+            for effect in scroll_stretch::step(&mut st.stretch, event) {
+                if let scroll_stretch::Effect::Set(to) = effect { st.offset = to; }
+            }
+        } else {
+            st.stretch = scroll_stretch::Stretch::Free;
+            st.offset = (st.offset - f64::from(dy)).clamp(0.0, st.max);
+        }
         st.moved();
         let moved = st.offset != before;
         if moved {
             st.note_source(if momentum { crate::ScrollSource::Momentum } else { crate::ScrollSource::Direct });
         }
-        st.land(stick);
+        // Stretched past its bottom, a stick-to-bottom viewport pins once it springs back.
+        if st.offset == st.offset.clamp(0.0, st.max) { st.land(stick) } else { st.mode = st.mode.to_rest() }
         log_event!(self, "wheel {dy:.1}");
         if moved { self.pointer.scroll_cancels_press(&self.tree.nodes, id); }
         self.scroll.ran_wheel_vertical(id, now, x, y, dy, mods, phased, moved, held);

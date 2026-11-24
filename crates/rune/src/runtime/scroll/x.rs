@@ -277,6 +277,12 @@ impl WheelLock {
     /// The gesture is the momentum of one that ended (`WheelEvent::momentum`).
     pub(in crate::runtime) fn momentum(&self) -> bool { self.phase.momentum() }
 
+    /// The fingers are on the trackpad at `now`: the platform began the gesture, and neither
+    /// ended it nor went quiet for `PHASED_IDLE`.
+    pub(in crate::runtime) fn touching(&self, now: f64) -> bool {
+        matches!(self.phase, WheelPhase::Phased { at } if now - at <= PHASED_IDLE)
+    }
+
     /// The next gesture starts, unphased. Only an owner whose gesture still has a delta waiting
     /// for `on_wheel` handlers keeps its place: `pending` is the gesture the oldest queued delta
     /// belongs to, so one that has run its last delta gives its owner up.

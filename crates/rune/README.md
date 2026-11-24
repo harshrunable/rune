@@ -527,7 +527,8 @@ policy changes are applied in the same mutation phase.
   a tab strip that overflows. The content (the first child) takes its natural width, unwrapped, and
   at least the viewport's, unless it sets a width other than `w_full`; `.scroll_xy()` also scrolls
   vertically and needs a bounded height like `.scroll`. Each axis has its own offset, momentum and
-  clamping, and on the web its own rubber band. A wheel or trackpad gesture moves one axis, picked
+  clamping, and on the web its own rubber band; on macOS a trackpad stretches a vertical viewport past
+  its ends and springs it back, as `NSScrollView` does (`runtime/scroll/stretch.rs`). A wheel or trackpad gesture moves one axis, picked
   by its first delta and held to its end (momentum included), as AppKit's predominant-axis scrolling
   does: mostly horizontal goes to the innermost horizontal viewport under the pointer, anything else
   to the innermost vertical one, so a vertical swipe over a filmstrip scrolls the page around it and

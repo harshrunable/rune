@@ -746,6 +746,7 @@ impl RuntimeCore {
         let scale = f64::from(self.env.scale * self.zoom());
         // Motion reduced mid-ease: a wheel's ease lands where it was going, at once.
         let land_wheels = !self.wheel_glides();
+        let touching = self.scroll.wheel_touching(self.now_clock());
         let mut moving = false;
         for i in 0..self.tree.nodes.len() {
             let Some(sp) = self.tree.nodes[i].scroll else { continue };
@@ -765,9 +766,27 @@ impl RuntimeCore {
                     && self.scroll_stack(i).and_then(|c| self.motion.stacks.get(&self.tree.nodes[c].id)).is_some_and(|s| s.growing)
             };
             let laid = if axes.y() { self.ease_to_shrunk_end(i, overflow) } else { None };
+            let height = f64::from(self.tree.nodes[i].target[3] - self.tree.nodes[i].target[1]);
             let Some(st) = self.scroll.scrolls.get_mut(&id) else { continue };
             let _ = scroll_mode::step(&mut st.mode, ModeEvent::Step { x_v: st.x.coast() });
             st.max = overflow.max(0.0);
+            // A trackpad holding it past an end, or its spring back, owns the frame.
+            let axis = scroll_stretch::Axis { offset: st.offset, max: st.max, height };
+            let mut stretched = false;
+            for effect in scroll_stretch::step(&mut st.stretch, scroll_stretch::Event::Tick { dt, touching, axis }) {
+                stretched = true;
+                match effect {
+                    scroll_stretch::Effect::Hold => { let _ = scroll_mode::step(&mut st.mode, ModeEvent::Hold); }
+                    scroll_stretch::Effect::Spring { offset, moving: m } => {
+                        st.offset = offset;
+                        st.mode = st.mode.to_rest();
+                        let _ = scroll_mode::step(&mut st.mode, ModeEvent::Coast { moving: m, source: crate::ScrollSource::EdgeReturn });
+                        moving |= m;
+                    }
+                    scroll_stretch::Effect::Set(_) => {}
+                }
+            }
+            if stretched { continue; }
             match st.mode {
                 ScrollMode::Pinned(_) if sp.stick_bottom => {
                     let before = st.offset;

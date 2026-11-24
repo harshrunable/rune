@@ -145,7 +145,7 @@ pub(in crate::runtime) fn step(state: &mut Option<TouchScroll>, event: TouchEven
 }
 
 /// A critically damped edge return, integrated exactly for variable frame times.
-fn rebound(offset: f64, velocity: f32, target: f64, dt: f32) -> (f64, f32) {
+pub(super) fn rebound(offset: f64, velocity: f32, target: f64, dt: f32) -> (f64, f32) {
     let dt = f64::from(dt);
     let displacement = offset - target;
     let b = f64::from(velocity) + 14.0 * displacement;

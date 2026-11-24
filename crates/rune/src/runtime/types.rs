@@ -484,6 +484,8 @@ pub(crate) struct ScrollState {
     /// for it to pass while the app steps its own glide frame by frame
     /// (`runtime/input/hover.rs`).
     pub(super) nudge: scroll_nudge::Nudge,
+    /// A macOS trackpad gesture's pull past its vertical ends (`runtime/scroll/stretch.rs`).
+    pub(super) stretch: scroll_stretch::Stretch,
 }
 
 /// What moves a viewport's horizontal offset, one motion at a time.
